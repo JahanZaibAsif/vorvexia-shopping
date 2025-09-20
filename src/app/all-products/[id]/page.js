@@ -1,26 +1,32 @@
 // app/product/[id]/page.js
 'use client';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState ,useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import Header from '../../../components/Header';
 import Footer from '../../../components/footer';
 import { useCart } from '../../../context/CartContext';
 import toast from 'react-hot-toast';
+import { useProducts } from '../../../context/ProductContext';
+
+
 
 
 
 export default function ProductDetail({ params }) {
+  const { id } = useParams();
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState('M');
   const [selectedColor, setSelectedColor] = useState('black');
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
+  const [ProductDetail, setProductDetail] = useState(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
     const { addToCart, toggleCart } = useCart();
 
 
-  // Mock product data - in real app, this would come from API based on params.id
   const product = {
     id: 1,
     name: "Premium Wireless Headphones",
@@ -73,10 +79,54 @@ export default function ProductDetail({ params }) {
     { id: 5, name: "Phone Stand", price: 19.99, image: "/product-backpack.jpg", rating: 4.6 }
   ];
 
+  const { 
+    loading, 
+    error, 
+    fetchProductById, 
+    fetchRelatedProducts,
+    clearCurrentProduct,
+    clearError
+  } = useProducts();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        clearError(); // Clear any previous errors
+        
+        // Fetch the main product
+        const productData = await fetchProductById(id);
+        setProductDetail(productData.product);
+        
+        if (productData.colors && productData.colors.length > 0) {
+          setSelectedColor(productData.colors[0].name);
+        }
+        if (productData.sizes && productData.sizes.length > 0) {
+          setSelectedSize(productData.sizes[0]);
+        }
+        
+        // Fetch related products
+        if (productData.category) {
+          fetchRelatedProducts(id, productData.category, 4);
+        }
+        
+      } catch (err) {
+        console.error('Error fetching product:', err);
+        // Error is handled by the context
+      }
+    };
+
+    fetchData();
+
+    // Cleanup function to clear current product when component unmounts
+    return () => {
+      clearCurrentProduct();
+    };
+  }, [id, fetchProductById, fetchRelatedProducts, clearCurrentProduct, clearError]);
+
+console.log(ProductDetail)
 
   
   const handleAddToCart = () => {
-    // Get the selected color object
     const colorObj = product.colors.find(c => c.name === selectedColor);
     
    const cartItem = {
@@ -104,7 +154,6 @@ export default function ProductDetail({ params }) {
       color: '#fff',
     },
   });
-    // Optional: Show success message or feedback
     console.log('Added to cart:', cartItem);
   };
 
@@ -135,37 +184,33 @@ export default function ProductDetail({ params }) {
             {/* Main Image */}
             <div className="relative h-96 lg:h-[500px] rounded-2xl overflow-hidden bg-gray-900">
               <Image
-                src={product.images[selectedImage]}
-                alt={product.name}
+                src={ProductDetail?.images?.[selectedImage]?.url || '/placeholder-image.jpg'}
+                alt={ProductDetail?.name || 'Product image'}
                 fill
                 className="object-cover"
                 priority
               />
               <div className="absolute top-4 left-4">
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                  product.badge === 'Best Seller' ? 'bg-blue-500' :
-                  product.badge === 'New' ? 'bg-green-500' :
-                  product.badge === 'Sale' ? 'bg-red-500' :
-                  'bg-purple-500'
-                } text-white`}>
+                <span
+                  className={`px-3 py-1 text-sm font-medium rounded-full ${
+                    product.badge === 'Best Seller'
+                      ? 'bg-blue-500'
+                      : product.badge === 'New'
+                      ? 'bg-green-500'
+                      : product.badge === 'Sale'
+                      ? 'bg-red-500'
+                      : 'bg-purple-500'
+                  } text-white`}
+                >
                   {product.badge}
                 </span>
               </div>
-              
-              {/* Wishlist Button */}
-              <button
-                onClick={() => setIsWishlisted(!isWishlisted)}
-                className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full transition-all transform hover:scale-110"
-              >
-                <svg className={`h-5 w-5 ${isWishlisted ? 'text-red-500 fill-current' : 'text-gray-800'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
             </div>
+
 
             {/* Thumbnail Images */}
             <div className="grid grid-cols-4 gap-4">
-              {product.images.map((image, index) => (
+              {ProductDetail?.images.map((image, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
@@ -176,8 +221,8 @@ export default function ProductDetail({ params }) {
                   }`}
                 >
                   <Image
-                    src={image}
-                    alt={`${product.name} view ${index + 1}`}
+                    src={image?.url}
+                    alt={`${ProductDetail?.name} view ${index + 1}`}
                     fill
                     className="object-cover"
                   />
@@ -190,8 +235,8 @@ export default function ProductDetail({ params }) {
           <div className="space-y-6">
             {/* Brand and Title */}
             <div>
-              <p className="text-purple-300 font-medium mb-2">{product.brand}</p>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4">{product.name}</h1>
+              <p className="text-purple-300 font-medium mb-2">{ProductDetail?.brand}</p>
+              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4">{ProductDetail?.name}</h1>
               
               {/* Rating and Reviews */}
               <div className="flex items-center space-x-4 mb-4">
@@ -212,7 +257,7 @@ export default function ProductDetail({ params }) {
                   <span className="text-gray-400">({product.reviews} reviews)</span>
                 </div>
                 <div className="text-gray-400">|</div>
-                <p className="text-gray-400">SKU: {product.sku}</p>
+                <p className="text-gray-400">SKU: {ProductDetail?.sku}</p>
               </div>
             </div>
 
@@ -231,9 +276,9 @@ export default function ProductDetail({ params }) {
 
             {/* Stock Status */}
             <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${product.inStock ? 'bg-green-400' : 'bg-red-400'}`}></div>
-              <span className={`font-medium ${product.inStock ? 'text-green-400' : 'text-red-400'}`}>
-                {product.inStock ? `In Stock (${product.stockCount} available)` : 'Out of Stock'}
+              <div className={`w-3 h-3 rounded-full ${ProductDetail?.stock ? 'bg-green-400' : 'bg-red-400'}`}></div>
+              <span className={`font-medium ${ProductDetail?.stock ? 'text-green-400' : 'text-red-400'}`}>
+                {ProductDetail?.stock ? `In Stock (${ProductDetail?.stock} available)` : 'Out of Stock'}
               </span>
             </div>
 
@@ -300,7 +345,7 @@ export default function ProductDetail({ params }) {
                   </button>
                   <span className="px-4 py-3 text-white font-medium">{quantity}</span>
                   <button
-                    onClick={() => setQuantity(Math.min(product.stockCount, quantity + 1))}
+                    onClick={() => setQuantity(Math.min(ProductDetail?.stock, quantity + 1))}
                     className="p-3 text-gray-300 hover:text-white transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,7 +436,7 @@ export default function ProductDetail({ params }) {
             {activeTab === 'description' && (
               <div className="prose prose-invert max-w-none">
                 <p className="text-gray-300 leading-relaxed text-lg mb-6">
-                  {product.description}
+                  {ProductDetail?.description}
                 </p>
                 <div className="grid md:grid-cols-2 gap-8">
                   <div>

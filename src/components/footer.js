@@ -11,9 +11,9 @@ function Footer() {
             <div>
               <Link href="/" className="flex items-center space-x-3 mb-6">
                 <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">V</span>
+                  <span className="text-white font-bold text-lg">MJ</span>
                 </div>
-                <span className="text-xl font-bold text-white">Vorvexia</span>
+                <span className="text-xl font-bold text-white">Global</span>
               </Link>
               <p className="text-gray-400 mb-6 leading-relaxed">
                 Redefining e-commerce with premium fashion, cutting-edge electronics, and luxury home goods across the EU.
@@ -60,7 +60,7 @@ function Footer() {
           
           <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-500 text-center md:text-left">
-              © 2025 Vorvexia. All rights reserved. Crafted with ❤️ in Europe.
+              © 2025 MJ. All rights reserved. Crafted with in Europe and USA.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="#" className="text-gray-500 hover:text-white transition-colors text-sm">Privacy</a>

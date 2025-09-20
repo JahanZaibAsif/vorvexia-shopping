@@ -3,65 +3,20 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Header from '../components/Header';
 import Footer from '../components/footer';
+import Hero from '../components/ui/hero';
 
 
 
 export default function Home() {
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white px-3 ">
      
      <Header/>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-900/20 to-blue-900/20"></div>
-        <div className="container mx-auto px-4 py-20">
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="md:w-1/2 mb-10 md:mb-0 z-10">
-              <div className="inline-block bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-6">
-                ✨ Winter Collection 2025
-              </div>
-              <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-                <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-                  Redefine
-                </span>
-                <br />
-                <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                  Your Style
-                </span>
-              </h1>
-              <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-                Discover premium fashion, cutting-edge electronics, and luxury home goods with free shipping across the EU. Experience shopping redefined.
-              </p>
-              <div className="flex space-x-4">
-                <button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg hover:shadow-purple-500/25">
-                  Shop Collection
-                </button>
-                <button className="border-2 border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white px-8 py-4 rounded-xl font-semibold transition-all hover:bg-gray-900/50">
-                  Watch Lookbook
-                </button>
-              </div>
-            </div>
-            <div className="md:w-1/2">
-              <div className="relative h-96 w-full">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-2xl"></div>
-                <Image
-                  src="/placeholder-hero1.jpg"
-                  alt="Winter Collection"
-                  fill
-                  className="object-cover rounded-2xl"
-                  priority
-                />
-                <div className="absolute inset-0 bg-black/20 rounded-2xl"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Animated background elements */}
-        <div className="absolute top-20 left-10 w-20 h-20 bg-purple-500/10 rounded-full blur-xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-32 h-32 bg-blue-500/10 rounded-full blur-xl animate-pulse delay-300"></div>
-      </section>
+      <Hero/>
+      
 
       {/* Featured Categories */}
       <section className="py-20 bg-gradient-to-b from-black to-gray-900">
