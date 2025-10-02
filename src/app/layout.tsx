@@ -4,6 +4,8 @@ import "./globals.css";
 import { CartProvider } from '../context/CartContext';
 import CartSidebar from '../components/CartSidebar';
 import { ProductProvider } from '../context/ProductContext';
+import { CategoryProvider } from '../context/CategoryContext';
+
 import { Toaster } from 'react-hot-toast';
 
 const geistSans = Geist({
@@ -31,6 +33,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <CategoryProvider>
         <ProductProvider>
         <CartProvider>
           {children}
@@ -48,6 +51,8 @@ export default function RootLayout({
           <CartSidebar />
         </CartProvider>
         </ProductProvider>
+      </CategoryProvider>
+
       </body>
     </html>
   );

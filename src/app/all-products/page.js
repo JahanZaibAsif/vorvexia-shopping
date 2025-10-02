@@ -6,8 +6,10 @@ import Link from 'next/link';
 import Footer from '../../components/footer';
 import Header from '../../components/Header';
 import { useCart } from '../../context/CartContext';
-import { useProducts } from '../../context/ProductContext';
+import { useCategories } from '../../context/CategoryContext';
 import toast from 'react-hot-toast';
+import NewsLatter1 from '../../components/ui/NewsLatter1';
+import QuantitySelector from '../../components/ui/QuantitySelector';
 
 import { 
   ProductLoadingState, 
@@ -15,114 +17,161 @@ import {
   ProductErrorState 
 } from '../../components/ui/ProductSkeleton';
 
-// Quantity selector component
-const QuantitySelector = ({ quantity, onQuantityChange, stock }) => {
-  const decreaseQuantity = () => {
-    if (quantity > 1) {
-      onQuantityChange(quantity - 1);
-    }
-  };
-
-  const increaseQuantity = () => {
-    if (quantity < stock) {
-      onQuantityChange(quantity + 1);
-    }
-  };
-
-  return (
-   <div className="flex items-center space-x-2">
-  <button
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      decreaseQuantity();
-    }}
-    disabled={quantity <= 1}
-    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
-  >
-    -
-  </button>
-
-  <span className="w-8 text-center text-black font-medium">{quantity}</span>
-
-  <button
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      increaseQuantity();
-    }}
-    disabled={quantity >= stock}
-    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
-  >
-    +
-  </button>
-</div>
-
-  );
-};
-
 export default function AllProducts() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('featured');
   const [priceRange, setPriceRange] = useState([0, 1000]);
   const [viewMode, setViewMode] = useState('grid');
   const [showFilters, setShowFilters] = useState(false);
-  const [quantities, setQuantities] = useState({}); // Track quantity for each product
+  const [quantities, setQuantities] = useState({});
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const categories = [
-    { id: 'all', name: 'All Products', count: 0 }, 
-    { id: 'fashion-women', name: "Women's Fashion", count: 0 },
-    { id: 'fashion-men', name: "Men's Fashion", count: 0 },
-    { id: 'electronics', name: 'Electronics', count: 0 },
-    { id: 'home-living', name: 'Home & Living', count: 0 }
-  ];
+  const productsPerPage = 12;
 
-  const { addToCart, toggleCart } = useCart();
+  const { addToCart } = useCart();
+  
+  // Use CategoryContext instead of ProductContext
   const { 
-    products, 
-    loading, 
-    fetchProducts,
-    error, 
-    clearError
-  } = useProducts();
+    categories,
+    categoryProducts,
+    currentCategory,
+    loading,
+    productsLoading,
+    error,
+    productsError,
+    availableBrands,
+    productsPriceRange,
+    fetchCategories,
+    fetchProductsByCategory,
+    fetchAllCategoryProducts,
+    setCategoryFilters,
+    clearError,
+    clearProductsError
+  } = useCategories();
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        await fetchCategories();
+      } catch (err) {
+        console.error('Error loading categories:', err);
+      }
+    };
+
+    loadCategories();
+  }, [fetchCategories]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        if (selectedCategory === 'all') {
+          await fetchAllCategoryProducts();
+        } else {
+          await fetchProductsByCategory(selectedCategory);
+        }
+        setCurrentPage(1); // Reset to first page when category changes
+      } catch (err) {
+        console.error('Error loading products:', err);
+      }
+    };
+
+    loadProducts();
+  }, [selectedCategory, fetchProductsByCategory, fetchAllCategoryProducts]);
 
   // Initialize quantities when products change
   useEffect(() => {
-    if (products.length > 0) {
+    if (categoryProducts.length > 0) {
       const initialQuantities = {};
-      products.forEach(product => {
+      categoryProducts.forEach(product => {
         const productId = product._id || product.id;
         initialQuantities[productId] = 1;
       });
       setQuantities(initialQuantities);
     }
-  }, [products]);
+  }, [categoryProducts]);
 
-  // Fetch products when component mounts
+  // Update price range when products change
   useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        clearError();
-        await fetchProducts();
-      } catch (err) {
-        console.error('Error fetching products:', err);
-        toast.error('Failed to load products. Please try again.');
-      }
-    };
+    if (categoryProducts.length > 0) {
+      const prices = categoryProducts.map(p => p.salePrice || p.originalPrice || p.price).filter(p => p);
+      const calculatedMaxPrice = prices.length > 0 ? Math.ceil(Math.max(...prices)) : 1000;
+      setPriceRange([0, calculatedMaxPrice]);
+    }
+  }, [categoryProducts]);
 
-    loadProducts();
-  }, []); // Remove dependencies to prevent infinite loop
+  // Filter products based on selected filters
+  const filteredProducts = categoryProducts.filter(product => {
+    // Price range filter
+    const productPrice = product.salePrice || product.originalPrice || product.price || 0;
+    if (productPrice < priceRange[0] || productPrice > priceRange[1]) {
+      return false;
+    }
 
-  // Filter products based on selected category
-  const filteredProducts = products.filter(product => {
-    if (selectedCategory === 'all') return true;
-    return product.category === selectedCategory;
+    // Brand filter
+    if (selectedBrands.length > 0 && product.brand && !selectedBrands.includes(product.brand)) {
+      return false;
+    }
+
+    return true;
   });
 
-  // Update category counts dynamically
-  const getCategoryCount = (categoryId) => {
-    if (categoryId === 'all') return products.length;
-    return products.filter(product => product.category === categoryId).length;
+  // Sort products
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const priceA = a.salePrice || a.originalPrice || a.price || 0;
+    const priceB = b.salePrice || b.originalPrice || b.price || 0;
+
+    switch (sortBy) {
+      case 'price-low':
+        return priceA - priceB;
+      case 'price-high':
+        return priceB - priceA;
+      case 'newest':
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      case 'rating':
+        return (b.rating || 0) - (a.rating || 0);
+      case 'name-asc':
+        return a.name.localeCompare(b.name);
+      case 'name-desc':
+        return b.name.localeCompare(a.name);
+      default: // featured
+        return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+    }
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
+  const startIndex = (currentPage - 1) * productsPerPage;
+  const paginatedProducts = sortedProducts.slice(startIndex, startIndex + productsPerPage);
+
+  // Handle brand selection
+  const handleBrandToggle = (brand) => {
+    setSelectedBrands(prev => 
+      prev.includes(brand) 
+        ? prev.filter(b => b !== brand)
+        : [...prev, brand]
+    );
+    setCurrentPage(1);
+  };
+
+  // Handle category change
+  const handleCategoryChange = (categoryId) => {
+    setSelectedCategory(categoryId);
+    setSelectedBrands([]); // Clear brand filters when category changes
+    setCurrentPage(1);
+  };
+
+  // Handle price range change
+  const handlePriceRangeChange = (newRange) => {
+    setPriceRange(newRange);
+    setCurrentPage(1);
+  };
+
+  // Handle sort change
+  const handleSortChange = (newSortBy) => {
+    setSortBy(newSortBy);
+    setCurrentPage(1);
   };
 
   // Handle quantity change for a specific product
@@ -169,8 +218,92 @@ export default function AllProducts() {
   };
 
   const handleRetry = () => {
-    fetchProducts();
+    if (selectedCategory === 'all') {
+      fetchAllCategoryProducts();
+    } else {
+      fetchProductsByCategory(selectedCategory);
+    }
   };
+
+  // Generate pagination buttons
+  const renderPaginationButtons = () => {
+    const buttons = [];
+    const maxVisiblePages = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    // Previous button
+    buttons.push(
+      <button 
+        key="prev"
+        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+        disabled={currentPage === 1}
+        className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+      >
+        <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+    );
+
+    // Page numbers
+    for (let page = startPage; page <= endPage; page++) {
+      buttons.push(
+        <button
+          key={page}
+          onClick={() => setCurrentPage(page)}
+          className={`w-10 h-10 rounded-lg font-medium transition-all ${
+            page === currentPage
+              ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'
+          }`}
+        >
+          {page}
+        </button>
+      );
+    }
+
+    // Next button
+    buttons.push(
+      <button 
+        key="next"
+        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+        disabled={currentPage === totalPages}
+        className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+      >
+        <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    );
+
+    return buttons;
+  };
+
+  // Get category counts
+  const getCategoryCount = (categoryId) => {
+    if (categoryId === 'all') return categoryProducts.length;
+    return categoryProducts.filter(product => product.category?._id === categoryId).length;
+  };
+
+  // Combine all categories with "All Products"
+  const allCategories = [
+    { id: 'all', name: 'All Products', count: getCategoryCount('all') },
+    ...categories.map(cat => ({ 
+      id: cat._id, 
+      name: cat.name, 
+      count: getCategoryCount(cat._id) 
+    }))
+  ];
+
+  const isLoading = loading || productsLoading;
+  const hasError = error || productsError;
+  const displayError = error || productsError;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -178,10 +311,10 @@ export default function AllProducts() {
       <Header/>
 
       {/* Error Message */}
-      {error && (
+      {displayError && (
         <div className="bg-red-900/50 border border-red-500/50 text-red-200 px-4 py-3 mx-4 mt-4 rounded-lg">
           <div className="flex items-center justify-between">
-            <span>Error: {error}</span>
+            <span>Error: {displayError}</span>
             <button 
               onClick={clearError}
               className="text-red-200 hover:text-white ml-4"
@@ -198,7 +331,9 @@ export default function AllProducts() {
           <nav className="flex items-center space-x-2 text-sm">
             <Link href="/" className="text-gray-400 hover:text-white transition-colors">Home</Link>
             <span className="text-gray-600">/</span>
-            <span className="text-white font-medium">All Products</span>
+            <span className="text-white font-medium">
+              {currentCategory ? currentCategory.name : 'All Products'}
+            </span>
           </nav>
         </div>
       </div>
@@ -209,16 +344,19 @@ export default function AllProducts() {
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-4">
               <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-                All Products
+                {currentCategory ? currentCategory.name : 'All Products'}
               </span>
             </h1>
             <p className="text-gray-300 text-lg mb-6">
-              Discover our complete collection of premium fashion, electronics, and home goods
+              {currentCategory 
+                ? `Discover our ${currentCategory.name.toLowerCase()} collection`
+                : 'Discover our complete collection of premium fashion, electronics, and home goods'
+              }
             </p>
             <div className="flex items-center justify-center space-x-4">
               <div className="bg-gray-800/50 backdrop-blur-md rounded-full px-4 py-2">
                 <span className="text-purple-300 font-medium">
-                  {loading && products.length === 0 ? 'Loading...' : `${filteredProducts.length} Products`}
+                  {isLoading && categoryProducts.length === 0 ? 'Loading...' : `${sortedProducts.length} Products`}
                 </span>
               </div>
               <div className="bg-gray-800/50 backdrop-blur-md rounded-full px-4 py-2">
@@ -237,10 +375,10 @@ export default function AllProducts() {
           <div className="flex flex-col lg:flex-row items-center justify-between space-y-4 lg:space-y-0">
             {/* Category Filter */}
             <div className="flex flex-wrap items-center space-x-2">
-              {categories.map((category) => (
+              {allCategories.map((category) => (
                 <button
                   key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
+                  onClick={() => handleCategoryChange(category.id)}
                   className={`px-4 py-2 rounded-full font-medium transition-all ${
                     selectedCategory === category.id
                       ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
@@ -248,7 +386,7 @@ export default function AllProducts() {
                   }`}
                 >
                   {category.name}
-                  <span className="ml-2 text-xs opacity-75">({getCategoryCount(category.id)})</span>
+                  <span className="ml-2 text-xs opacity-75">({category.count})</span>
                 </button>
               ))}
             </div>
@@ -258,7 +396,7 @@ export default function AllProducts() {
               {/* Sort Dropdown */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(e) => handleSortChange(e.target.value)}
                 className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
               >
                 <option value="featured">Featured</option>
@@ -266,6 +404,8 @@ export default function AllProducts() {
                 <option value="price-high">Price: High to Low</option>
                 <option value="newest">Newest First</option>
                 <option value="rating">Highest Rated</option>
+                <option value="name-asc">Name: A-Z</option>
+                <option value="name-desc">Name: Z-A</option>
               </select>
 
               {/* View Mode Toggle */}
@@ -320,9 +460,9 @@ export default function AllProducts() {
                 <input
                   type="range"
                   min="0"
-                  max="1000"
+                  max={productsPriceRange.max || 1000}
                   value={priceRange[1]}
-                  onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                  onChange={(e) => handlePriceRangeChange([priceRange[0], parseInt(e.target.value)])}
                   className="w-full accent-purple-500"
                 />
               </div>
@@ -331,40 +471,21 @@ export default function AllProducts() {
             {/* Brand Filter */}
             <div className="bg-gray-900/50 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
               <h3 className="text-lg font-semibold text-white mb-4">Brand</h3>
-              <div className="space-y-3">
-                {['Vorvexia', 'TechPro', 'StyleCraft', 'HomeDesign', 'UrbanWear'].map((brand) => (
+              <div className="space-y-3 max-h-60 overflow-y-auto">
+                {availableBrands.map((brand) => (
                   <label key={brand} className="flex items-center space-x-3 cursor-pointer group">
-                    <input type="checkbox" className="accent-purple-500" />
+                    <input 
+                      type="checkbox" 
+                      checked={selectedBrands.includes(brand)}
+                      onChange={() => handleBrandToggle(brand)}
+                      className="accent-purple-500" 
+                    />
                     <span className="text-gray-300 group-hover:text-white transition-colors">{brand}</span>
                   </label>
                 ))}
-              </div>
-            </div>
-
-            {/* Rating Filter */}
-            <div className="bg-gray-900/50 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
-              <h3 className="text-lg font-semibold text-white mb-4">Rating</h3>
-              <div className="space-y-3">
-                {[5, 4, 3, 2, 1].map((rating) => (
-                  <label key={rating} className="flex items-center space-x-3 cursor-pointer group">
-                    <input type="checkbox" className="accent-purple-500" />
-                    <div className="flex items-center space-x-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-600'}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-gray-300 group-hover:text-white transition-colors">& Up</span>
-                    </div>
-                  </label>
-                ))}
+                {availableBrands.length === 0 && !isLoading && (
+                  <span className="text-gray-400 text-sm">No brands available</span>
+                )}
               </div>
             </div>
           </div>
@@ -372,36 +493,33 @@ export default function AllProducts() {
           {/* Products Display */}
           <div className="flex-1">
             {/* Show different states based on loading and data */}
-            {loading && products.length === 0 ? (
-              // Initial loading state - show skeletons
+            {isLoading && categoryProducts.length === 0 ? (
               <ProductLoadingState 
                 isInitialLoad={true}
                 viewMode={viewMode}
               />
-            ) : !loading && products.length === 0 && error ? (
-              // Error state
+            ) : !isLoading && categoryProducts.length === 0 && hasError ? (
               <ProductErrorState 
-                error={error}
+                error={displayError}
                 onRetry={handleRetry}
                 onClearError={clearError}
               />
-            ) : !loading && products.length === 0 && !error ? (
-              // Empty state
+            ) : !isLoading && categoryProducts.length === 0 && !hasError ? (
               <ProductEmptyState />
             ) : (
               <>
-                {/* Show loading indicator when loading more products */}
-                {loading && products.length > 0 && (
-                  <ProductLoadingState 
-                    isInitialLoad={false}
-                    productsCount={filteredProducts.length}
-                  />
-                )}
+                {/* Products Count and Pagination Info */}
+                <div className="flex justify-between items-center mb-6">
+                  <p className="text-gray-400">
+                    Showing {startIndex + 1}-{Math.min(startIndex + productsPerPage, sortedProducts.length)} of {sortedProducts.length} products
+                    {selectedCategory !== 'all' && currentCategory && ` in ${currentCategory.name}`}
+                  </p>
+                </div>
 
                 {/* Products Grid/List */}
                 {viewMode === 'grid' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                    {filteredProducts.map((product) => {
+                    {paginatedProducts.map((product) => {
                       const productId = product._id || product.id;
                       const quantity = quantities[productId] || 1;
                       
@@ -420,17 +538,17 @@ export default function AllProducts() {
                               <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-all"></div>
                               
                               {/* Badge */}
-                              {product.badge && (
+                              {product.salePrice && product.originalPrice && product.salePrice < product.originalPrice && (
                                 <div className="absolute top-4 left-4">
-                                  <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                                    product.badge === 'Sale' ? 'bg-red-500' :
-                                    product.badge === 'New' ? 'bg-green-500' :
-                                    product.badge === 'Limited' ? 'bg-purple-500' :
-                                    product.badge === 'Deal' ? 'bg-orange-500' :
-                                    product.badge === 'Exclusive' ? 'bg-pink-500' :
-                                    'bg-blue-500'
-                                  } text-white`}>
-                                    {product.badge}
+                                  <span className="bg-red-500 text-white px-3 py-1 text-xs font-medium rounded-full">
+                                    Sale
+                                  </span>
+                                </div>
+                              )}
+                              {product.productType === 'new' && (
+                                <div className="absolute top-4 left-4">
+                                  <span className="bg-green-500 text-white px-3 py-1 text-xs font-medium rounded-full">
+                                    New
                                   </span>
                                 </div>
                               )}
@@ -441,50 +559,6 @@ export default function AllProducts() {
                                   <span className="bg-gray-800/90 text-gray-300 px-3 py-1 text-xs font-medium rounded-full">
                                     Out of Stock
                                   </span>
-                                </div>
-                              )}
-
-                              {/* Action buttons */}
-                              <div className="absolute top-4 right-4 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-all">
-                                {product.stock && product.stock > 0 && (
-                                  <>
-                                    <button className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all transform hover:scale-110">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                      </svg>
-                                    </button>
-                                    <button className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all transform hover:scale-110">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                      </svg>
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-
-                              {/* Color options */}
-                              {product.colors && (
-                                <div className="absolute bottom-4 left-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-all">
-                                  {product.colors.slice(0, 4).map((color, index) => (
-                                    <div
-                                      key={index}
-                                      className={`w-6 h-6 rounded-full border-2 border-white shadow-lg ${
-                                        color === 'black' ? 'bg-black' :
-                                        color === 'white' ? 'bg-white' :
-                                        color === 'blue' ? 'bg-blue-500' :
-                                        color === 'brown' ? 'bg-amber-800' :
-                                        color === 'tan' ? 'bg-amber-200' :
-                                        color === 'navy' ? 'bg-blue-900' :
-                                        color === 'burgundy' ? 'bg-red-900' :
-                                        color === 'brass' ? 'bg-yellow-600' :
-                                        color === 'gray' ? 'bg-gray-500' :
-                                        color === 'silver' ? 'bg-gray-300' :
-                                        color === 'gold' ? 'bg-yellow-400' :
-                                        'bg-gray-400'
-                                      }`}
-                                    />
-                                  ))}
                                 </div>
                               )}
 
@@ -559,7 +633,7 @@ export default function AllProducts() {
                 ) : (
                   /* List View */
                   <div className="space-y-6">
-                    {filteredProducts.map((product) => {
+                    {paginatedProducts.map((product) => {
                       const productId = product._id || product.id;
                       const quantity = quantities[productId] || 1;
                       
@@ -576,20 +650,6 @@ export default function AllProducts() {
                                   className="object-cover group-hover:scale-105 transition-all duration-300"
                                   loading="lazy"
                                 />
-                                {product.badge && (
-                                  <div className="absolute top-2 left-2">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                      product.badge === 'Sale' ? 'bg-red-500' :
-                                      product.badge === 'New' ? 'bg-green-500' :
-                                      product.badge === 'Limited' ? 'bg-purple-500' :
-                                      product.badge === 'Deal' ? 'bg-orange-500' :
-                                      product.badge === 'Exclusive' ? 'bg-pink-500' :
-                                      'bg-blue-500'
-                                    } text-white`}>
-                                      {product.badge}
-                                    </span>
-                                  </div>
-                                )}
                               </div>
 
                               {/* Product Details */}
@@ -599,53 +659,6 @@ export default function AllProducts() {
                                     {product.name}
                                   </h3>
                                   
-                                  {/* Rating */}
-                                  {product.rating && (
-                                    <div className="flex items-center space-x-2 mb-3">
-                                      <div className="flex">
-                                        {[...Array(5)].map((_, i) => (
-                                          <svg
-                                            key={i}
-                                            className={`w-4 h-4 ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-600'}`}
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
-                                          >
-                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                          </svg>
-                                        ))}
-                                      </div>
-                                      <span className="text-gray-400 text-sm">
-                                        {product.rating} ({product.reviews || 0} reviews)
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* Colors */}
-                                  {product.colors && product.colors.length > 0 && (
-                                    <div className="flex items-center space-x-2 mb-3">
-                                      <span className="text-gray-400 text-sm">Colors:</span>
-                                      {product.colors.slice(0, 5).map((color, index) => (
-                                        <div
-                                          key={index}
-                                          className={`w-5 h-5 rounded-full border border-gray-600 ${
-                                            color === 'black' ? 'bg-black' :
-                                            color === 'white' ? 'bg-white' :
-                                            color === 'blue' ? 'bg-blue-500' :
-                                            color === 'brown' ? 'bg-amber-800' :
-                                            color === 'tan' ? 'bg-amber-200' :
-                                            color === 'navy' ? 'bg-blue-900' :
-                                            color === 'burgundy' ? 'bg-red-900' :
-                                            color === 'brass' ? 'bg-yellow-600' :
-                                            color === 'gray' ? 'bg-gray-500' :
-                                            color === 'silver' ? 'bg-gray-300' :
-                                            color === 'gold' ? 'bg-yellow-400' :
-                                            'bg-gray-400'
-                                          }`}
-                                        />
-                                      ))}
-                                    </div>
-                                  )}
-
                                   {/* Stock Status */}
                                   <div className="mb-4">
                                     <span className={`text-sm font-medium ${
@@ -675,12 +688,6 @@ export default function AllProducts() {
                                   </div>
 
                                   <div className="flex items-center space-x-3">
-                                    <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-full transition-colors">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300 hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                      </svg>
-                                    </button>
-                                    
                                     {product.stock && product.stock > 0 ? (
                                       <div className="flex items-center space-x-3">
                                         <QuantitySelector
@@ -712,44 +719,17 @@ export default function AllProducts() {
                 )}
 
                 {/* Pagination */}
-                <div className="mt-16 flex justify-center">
-                  <div className="flex items-center space-x-2">
-                    <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50">
-                      <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    
-                    {[1, 2, 3, 4, 5].map((page) => (
-                      <button
-                        key={page}
-                        className={`w-10 h-10 rounded-lg font-medium transition-all ${
-                          page === 1
-                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                    
-                    <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-                      <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
+                {totalPages > 1 && (
+                  <div className="mt-16 flex justify-center">
+                    <div className="flex items-center space-x-2">
+                      {renderPaginationButtons()}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Load More Button */}
-                <div className="mt-8 text-center">
-                  <button 
-                    onClick={() => fetchProducts()}
-                    disabled={loading}
-                    className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white px-8 py-3 rounded-xl font-semibold transition-all hover:scale-105 disabled:hover:scale-100"
-                  >
-                    {loading ? 'Loading...' : 'Load More Products'}
-                  </button>
+                {/* Page Info */}
+                <div className="mt-4 text-center text-gray-400 text-sm">
+                  Page {currentPage} of {totalPages}
                 </div>
               </>
             )}
@@ -757,32 +737,7 @@ export default function AllProducts() {
         </div>
       </div>
 
-      {/* Newsletter Section */}
-      <section className="py-16 bg-gradient-to-r from-purple-900 to-blue-900 relative overflow-hidden mt-16">
-        <div className="absolute inset-0 bg-black/50"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Never Miss a Deal
-            </h2>
-            <p className="text-purple-100 text-lg mb-8">
-              Subscribe to get notified about new arrivals, exclusive sales, and special offers.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
-              <input 
-                type="email" 
-                placeholder="Your email address" 
-                className="flex-grow px-6 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-white/40 transition-all"
-              />
-              <button className="bg-white text-purple-900 px-6 py-3 rounded-xl font-semibold hover:bg-gray-100 transition-all transform hover:scale-105">
-                Subscribe
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="absolute top-10 left-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-10 right-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl"></div>
-      </section>
+     <NewsLatter1/>
 
       {/* Footer */}
       <Footer/>

@@ -191,8 +191,7 @@ export function ProductProvider({ children }) {
     dispatch({ type: 'FETCH_PRODUCTS_START' });
     
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/products?category=${category}${limit ? `&limit=${limit}` : ''}`
+      const response = await fetch(`${API_BASE_URL}/products?category=${category}${limit ? `&limit=${limit}` : ''}`
       );
       
       if (!response.ok) {
@@ -210,6 +209,7 @@ export function ProductProvider({ children }) {
     }
   }, []);
 
+  
   const searchProducts = useCallback(async (searchTerm, filters = {}) => {
     dispatch({ type: 'FETCH_PRODUCTS_START' });
     
