@@ -41,7 +41,7 @@ const openQuickView = (productId: string | number) => {
     
       <ProductCategory />
     
-      <TreandingProduct  />
+      <TreandingProduct onProductClick={openQuickView} />
       
       <LatestProduct onProductClick={openQuickView} />
 

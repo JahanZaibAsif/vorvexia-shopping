@@ -43,19 +43,19 @@ export default function Header() {
               New
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 transition-all group-hover:w-full"></span>
             </Link>
-            <Link href="/women" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
+            <Link href="/all-products/women" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
               Women
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 transition-all group-hover:w-full"></span>
             </Link>
-            <Link href="/men" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
+            <Link href="/all-products/men" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
               Men
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 transition-all group-hover:w-full"></span>
             </Link>
-            <Link href="/electronics" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
+            <Link href="/all-products/electronics" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
               Electronics
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 transition-all group-hover:w-full"></span>
             </Link>
-            <Link href="/home" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
+            <Link href="/all-products/home" className="text-gray-300 hover:text-white font-medium transition-colors relative group">
               Home & Living
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 transition-all group-hover:w-full"></span>
             </Link>

@@ -10,6 +10,7 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
+  const [imageError, setImageError] = useState({});
   const { addToCart } = useCart();
   const { 
     products,
@@ -25,18 +26,16 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
     if (productId && isOpen) {
       const fetchProductData = async () => {
         try {
-          // Try to fetch from API first
-          const product = await fetchProductById(productId);
-          if (product) {
-            setProductData(product);
+          const response = await fetchProductById(productId);
+          console.log('Fetched product:', response);
+          if (response?.product) {
+            setProductData(response.product);
           } else {
-            // Fallback to local products array
             const localProduct = products.find(p => p.id === productId || p._id === productId);
             setProductData(localProduct || null);
           }
         } catch (err) {
           console.error('Error fetching product:', err);
-          // Fallback to local products array
           const localProduct = products.find(p => p.id === productId || p._id === productId);
           setProductData(localProduct || null);
         }
@@ -54,6 +53,7 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
       setSelectedSize('');
       setSelectedColor('');
       setProductData(null);
+      setImageError({});
     }
   }, [isOpen]);
 
@@ -74,26 +74,43 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
     };
   }, [isOpen, onClose]);
 
+  // Helper function to extract image URL from various formats
+  const getImageUrl = (imageData) => {
+    if (!imageData) return '/placeholder-image.jpg';
+    
+    // If it's already a string URL
+    if (typeof imageData === 'string') return imageData;
+    
+    // If it's an object with url property
+    if (imageData.url) return imageData.url;
+    
+    return '/placeholder-image.jpg';
+  };
+
+  // Process images array to extract URLs
+  const processImages = (images) => {
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return ['/placeholder-image.jpg'];
+    }
+    
+    return images.map(img => getImageUrl(img)).filter(url => url && url !== '');
+  };
+
   // Safe product data merge with proper image handling
   const mergedProductData = productData ? {
     ...productData,
-    // Ensure images is always an array and handle images.url structure
-    images: Array.isArray(productData.images) 
-      ? productData.images 
-      : productData.images?.url 
-        ? [productData.images.url]
-        : productData.image
-        ? [productData.image]
-        : ['/placeholder-image.jpg'],
+    images: processImages(productData.images),
     name: productData.name || 'Product Name',
-    price: productData.price || '€0.00',
+    price: productData.salePrice ? `$${productData.salePrice}` : productData.price || '$0.00',
+    originalPrice: productData.originalPrice ? `$${productData.originalPrice}` : null,
     description: productData.description || 'No description available.',
     category: productData.category || 'Uncategorized',
-    rating: productData.rating || 0,
+    rating: productData.rating || 4.5,
     reviewCount: productData.reviewCount || 0,
     features: productData.features || [],
     sizes: productData.sizes || [],
     colors: productData.colors || [],
+    stock: productData.stock || 0,
   } : null;
 
   // Safe image navigation functions
@@ -111,7 +128,11 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
     );
   };
 
-  const incrementQuantity = () => setQuantity(prev => prev + 1);
+  const incrementQuantity = () => {
+    const maxStock = mergedProductData?.stock || 999;
+    setQuantity(prev => prev < maxStock ? prev + 1 : prev);
+  };
+
   const decrementQuantity = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
 
   const handleAddToCart = () => {
@@ -135,6 +156,10 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
     setSelectedColor(color);
   };
 
+  const handleImageError = (index) => {
+    setImageError(prev => ({ ...prev, [index]: true }));
+  };
+
   if (!isOpen) return null;
 
   // Loading state
@@ -143,7 +168,10 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-80 backdrop-blur-sm">
         <div className="relative bg-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-center h-96">
-            <div className="text-white text-lg">Loading product...</div>
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <div className="text-white text-lg">Loading product...</div>
+            </div>
           </div>
         </div>
       </div>
@@ -151,7 +179,7 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
   }
 
   // Get the current image source safely
-  const images = mergedProductData.images || [];
+  const images = mergedProductData.images || ['/placeholder-image.jpg'];
   const currentImage = images[selectedImageIndex] || images[0] || "/placeholder-image.jpg";
   const hasMultipleImages = images.length > 1;
 
@@ -171,15 +199,24 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
           <div className="relative">
             {/* Main image */}
             <div className="relative h-80 md:h-96 rounded-xl overflow-hidden bg-gray-800">
-              <Image
-                src={currentImage}
-                alt={mergedProductData.name}
-                fill
-                className="object-cover"
-                onError={(e) => {
-                  e.target.src = "/placeholder-image.jpg";
-                }}
-              />
+              {currentImage && currentImage !== "" && !imageError[selectedImageIndex] ? (
+                <Image
+                  src={currentImage}
+                  alt={mergedProductData.name || "Product"}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority={selectedImageIndex === 0}
+                  onError={() => handleImageError(selectedImageIndex)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                  <div className="text-center text-gray-400">
+                    <ShoppingCart className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                    <p>No image available</p>
+                  </div>
+                </div>
+              )}
               
               {/* Navigation arrows - only show if multiple images */}
               {hasMultipleImages && (
@@ -206,10 +243,10 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
                     <button
                       key={index}
                       onClick={() => setSelectedImageIndex(index)}
-                      className={`w-2 h-2 rounded-full ${
+                      className={`w-2 h-2 rounded-full transition-all ${
                         index === selectedImageIndex 
-                          ? 'bg-white' 
-                          : 'bg-white bg-opacity-50'
+                          ? 'bg-white w-6' 
+                          : 'bg-white bg-opacity-50 hover:bg-opacity-75'
                       }`}
                     />
                   ))}
@@ -224,21 +261,26 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
                   <button
                     key={index}
                     onClick={() => setSelectedImageIndex(index)}
-                    className={`relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden ${
+                    className={`relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-800 ${
                       index === selectedImageIndex 
                         ? 'ring-2 ring-purple-500' 
                         : 'opacity-70 hover:opacity-100'
                     } transition-all`}
                   >
-                    <Image
-                      src={image || "/placeholder-image.jpg"}
-                      alt={`Thumbnail ${index + 1}`}
-                      fill
-                      className="object-cover"
-                      onError={(e) => {
-                        e.target.src = "/placeholder-image.jpg";
-                      }}
-                    />
+                    {image && !imageError[`thumb-${index}`] ? (
+                      <Image
+                        src={image}
+                        alt={`Thumbnail ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                        onError={() => handleImageError(`thumb-${index}`)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ShoppingCart className="w-6 h-6 text-gray-600" />
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -248,7 +290,7 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
           {/* Product Details */}
           <div className="py-4">
             <div className="mb-4">
-              <span className="text-sm text-purple-400 font-medium">{mergedProductData.category}</span>
+              <span className="text-sm text-purple-400 font-medium uppercase">{mergedProductData.category}</span>
               <h2 className="text-2xl font-bold text-white mt-1">{mergedProductData.name}</h2>
               
               {/* Rating */}
@@ -265,25 +307,36 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
                   {mergedProductData.rating} ({mergedProductData.reviewCount} reviews)
                 </span>
               </div>
+
+              {/* Stock status */}
+              {mergedProductData.stock > 0 ? (
+                <span className="inline-block mt-2 text-sm text-green-400">
+                  ✓ In Stock ({mergedProductData.stock} available)
+                </span>
+              ) : (
+                <span className="inline-block mt-2 text-sm text-red-400">
+                  Out of Stock
+                </span>
+              )}
             </div>
 
             {/* Price */}
             <div className="mb-6">
               <div className="flex items-center space-x-2">
-                <span className="text-2xl font-bold text-white">{mergedProductData.price}</span>
-                {mergedProductData.originalPrice && (
-                  <span className="text-lg text-gray-500 line-through">{mergedProductData.originalPrice}</span>
-                )}
-                {mergedProductData.originalPrice && (
-                  <span className="text-sm bg-red-500 text-white px-2 py-1 rounded-md">
-                    Save {((parseFloat(mergedProductData.originalPrice.replace('€', '')) - parseFloat(mergedProductData.price.replace('€', ''))) / parseFloat(mergedProductData.originalPrice.replace('€', '')) * 100).toFixed(0)}%
-                  </span>
+                <span className="text-3xl font-bold text-white">{mergedProductData.price}</span>
+                {mergedProductData.originalPrice && mergedProductData.originalPrice !== mergedProductData.price && (
+                  <>
+                    <span className="text-lg text-gray-500 line-through">{mergedProductData.originalPrice}</span>
+                    <span className="text-sm bg-red-500 text-white px-2 py-1 rounded">
+                      {Math.round((1 - (parseFloat(mergedProductData.price.replace('$', '')) / parseFloat(mergedProductData.originalPrice.replace('$', '')))) * 100)}% OFF
+                    </span>
+                  </>
                 )}
               </div>
             </div>
 
             {/* Description */}
-            <p className="text-gray-300 mb-6">{mergedProductData.description}</p>
+            <p className="text-gray-300 mb-6 leading-relaxed">{mergedProductData.description}</p>
 
             {/* Features */}
             {mergedProductData.features.length > 0 && (
@@ -305,23 +358,22 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
               {/* Colors */}
               {mergedProductData.colors.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-white mb-2">Color</h3>
-                  <div className="flex space-x-2">
+                  <h3 className="text-sm font-medium text-white mb-2">
+                    Color {selectedColor && <span className="text-purple-400">- {selectedColor}</span>}
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
                     {mergedProductData.colors.map((color, index) => (
                       <button
                         key={index}
                         onClick={() => handleColorSelect(color)}
-                        className={`w-8 h-8 rounded-full border-2 transition-all ${
-                          selectedColor === color 
-                            ? 'border-purple-500 ring-2 ring-purple-200' 
-                            : 'border-gray-700 hover:border-purple-500'
+                        className={`px-3 py-1.5 text-sm border rounded-md transition-colors ${
+                          selectedColor === color
+                            ? 'border-purple-500 text-purple-400 bg-purple-900 bg-opacity-20'
+                            : 'border-gray-700 text-gray-300 hover:border-purple-500 hover:text-purple-400'
                         }`}
-                        style={{ 
-                          backgroundColor: color.toLowerCase(),
-                          borderColor: color.toLowerCase() === 'white' ? '#e5e7eb' : ''
-                        }}
-                        title={color}
-                      />
+                      >
+                        {color}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -330,7 +382,9 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
               {/* Sizes */}
               {mergedProductData.sizes.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-white mb-2">Size</h3>
+                  <h3 className="text-sm font-medium text-white mb-2">
+                    Size {selectedSize && <span className="text-purple-400">- {selectedSize}</span>}
+                  </h3>
                   <div className="flex flex-wrap gap-2">
                     {mergedProductData.sizes.map((size, index) => (
                       <button
@@ -355,14 +409,16 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
                 <div className="flex items-center">
                   <button
                     onClick={decrementQuantity}
-                    className="p-2 bg-gray-800 rounded-l-md hover:bg-gray-700 transition-colors text-white"
+                    disabled={quantity <= 1}
+                    className="p-2 bg-gray-800 rounded-l-md hover:bg-gray-700 transition-colors text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     -
                   </button>
-                  <span className="px-4 py-2 bg-gray-800 text-white">{quantity}</span>
+                  <span className="px-6 py-2 bg-gray-800 text-white min-w-[60px] text-center">{quantity}</span>
                   <button
                     onClick={incrementQuantity}
-                    className="p-2 bg-gray-800 rounded-r-md hover:bg-gray-700 transition-colors text-white"
+                    disabled={quantity >= mergedProductData.stock}
+                    className="p-2 bg-gray-800 rounded-r-md hover:bg-gray-700 transition-colors text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     +
                   </button>
@@ -390,10 +446,11 @@ const ProductQuickView = ({ productId, isOpen, onClose }) => {
             <div className="flex space-x-4">
               <button 
                 onClick={handleAddToCart}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-xl font-medium transition-colors flex items-center justify-center"
+                disabled={mergedProductData.stock === 0}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-xl font-medium transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingCart className="w-5 h-5 mr-2" />
-                Add to Cart
+                {mergedProductData.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
               </button>
               <button className="p-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-colors">
                 <Heart className="w-5 h-5" />

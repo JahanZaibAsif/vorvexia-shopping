@@ -1,7 +1,7 @@
-// app/product/[id]/page.js
+// app/all-products/[id]/page.js
 'use client';
 import Image from 'next/image';
-import { useState ,useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Header from '../../../components/Header';
 import Footer from '../../../components/footer';
@@ -9,153 +9,406 @@ import { useCart } from '../../../context/CartContext';
 import toast from 'react-hot-toast';
 import { useProducts } from '../../../context/ProductContext';
 
+// Loading Component
+function ProductDetailLoading() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <Header />
+      
+      {/* Breadcrumb Loading */}
+      <div className="bg-gray-900/50 border-b border-gray-800">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center space-x-2">
+            <div className="h-4 w-20 bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-4 w-4 bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-4 w-24 bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-4 w-4 bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-4 w-32 bg-gray-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
 
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Image Loading */}
+          <div className="space-y-4">
+            <div className="relative h-96 lg:h-[500px] rounded-2xl overflow-hidden bg-gray-800 animate-pulse"></div>
+            <div className="grid grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-24 rounded-xl bg-gray-800 animate-pulse"></div>
+              ))}
+            </div>
+          </div>
 
+          {/* Content Loading */}
+          <div className="space-y-6">
+            <div className="h-8 w-48 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-12 w-3/4 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-6 w-32 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-10 w-40 bg-gray-800 rounded animate-pulse"></div>
+            <div className="h-32 bg-gray-800 rounded-xl animate-pulse"></div>
+            <div className="h-20 bg-gray-800 rounded-xl animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
+// Error Component
+function ProductDetailError({ error, onRetry }) {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <Header />
+      <div className="container mx-auto px-4 py-12 text-center">
+        <div className="max-w-md mx-auto">
+          <div className="w-24 h-24 mx-auto mb-6 bg-red-500/20 rounded-full flex items-center justify-center">
+            <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-4">Product Not Found</h2>
+          <p className="text-gray-400 mb-6">
+            {error || "Sorry, we couldn't find the product you're looking for."}
+          </p>
+          <div className="flex space-x-4 justify-center">
+            <button
+              onClick={onRetry}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+            >
+              Try Again
+            </button>
+            <a
+              href="/products"
+              className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+            >
+              Browse Products
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-export default function ProductDetail({ params }) {
-  const { id } = useParams();
+// Safe Image Component with proper alt text handling
+function SafeImage({ src, alt = "Product image", ...props }) {
+  const [imgSrc, setImgSrc] = useState(src);
+  const [hasError, setHasError] = useState(false);
 
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedSize, setSelectedSize] = useState('M');
-  const [selectedColor, setSelectedColor] = useState('black');
-  const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('description');
-  const [ProductDetail, setProductDetail] = useState(null);
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  useEffect(() => {
+    setImgSrc(src);
+    setHasError(false);
+  }, [src]);
 
-    const { addToCart, toggleCart } = useCart();
-
-
-  const product = {
-    id: 1,
-    name: "Premium Wireless Headphones",
-    price: 149.99,
-    originalPrice: 199.99,
-    brand: "TechPro",
-    rating: 4.8,
-    reviews: 245,
-    badge: "Best Seller",
-    inStock: true,
-    stockCount: 24,
-    sku: "TP-WH-001",
-    category: "Electronics",
-    images: [
-      "/product-headphones.jpg",
-      "/product-headphones.jpg",
-      "/product-headphones.jpg",
-      "/product-headphones.jpg"
-    ],
-    colors: [
-      { name: 'black', value: '#000000', label: 'Midnight Black' },
-      { name: 'white', value: '#ffffff', label: 'Pearl White' },
-      { name: 'blue', value: '#3b82f6', label: 'Ocean Blue' }
-    ],
-    sizes: ['S', 'M', 'L', 'XL'],
-    features: [
-      "Active Noise Cancellation",
-      "30-hour battery life",
-      "Premium leather comfort",
-      "Hi-Res audio certified",
-      "Quick charge: 3 hours in 15 minutes"
-    ],
-    specifications: {
-      "Driver Size": "40mm",
-      "Frequency Response": "20Hz - 20kHz",
-      "Impedance": "32Ω",
-      "Sensitivity": "100dB",
-      "Weight": "250g",
-      "Connectivity": "Bluetooth 5.0, 3.5mm jack",
-      "Battery": "30 hours playback",
-      "Charging": "USB-C fast charging"
-    },
-    description: "Experience audio like never before with our Premium Wireless Headphones. Featuring industry-leading noise cancellation technology and premium materials, these headphones deliver exceptional sound quality and all-day comfort. Perfect for music lovers, professionals, and anyone who demands the best in audio technology."
+  const handleError = () => {
+    setHasError(true);
+    setImgSrc('/placeholder-image.jpg');
   };
 
-  const relatedProducts = [
-    { id: 2, name: "Smart Watch Pro", price: 299.99, image: "/home2.jpg", rating: 4.9 },
-    { id: 3, name: "Wireless Speaker", price: 89.99, image: "/product-speaker.jpg", rating: 4.7 },
-    { id: 4, name: "USB-C Cable", price: 29.99, image: "/electronic1.jpg", rating: 4.5 },
-    { id: 5, name: "Phone Stand", price: 19.99, image: "/product-backpack.jpg", rating: 4.6 }
-  ];
+  // Ensure alt is always a string and not empty
+  const safeAlt = typeof alt === 'string' && alt.trim() ? alt : "Product image";
 
+  return (
+    <Image
+      src={hasError ? '/placeholder-image.jpg' : imgSrc}
+      alt={safeAlt}
+      onError={handleError}
+      {...props}
+    />
+  );
+}
+
+// Helper function to transform API data to frontend format
+const transformProductData = (product) => {
+  if (!product) return null;
+  
+  return {
+    id: product._id,
+    name: product.name,
+    brand: product.brand,
+    category: product.category,
+    description: product.description,
+    price: product.salePrice || product.price, // Use salePrice if available
+    originalPrice: product.originalPrice,
+    rating: product.rating || 4.5,
+    reviews: product.reviews || 0,
+    stock: product.stock,
+    sku: product.sku,
+    images: product.images || [],
+    colors: Array.isArray(product.colors) 
+      ? product.colors.map(color => ({
+          name: color,
+          value: getColorValue(color),
+          label: color
+        }))
+      : [],
+    sizes: Array.isArray(product.sizes) ? product.sizes : [],
+    features: product.features || getDefaultFeatures(product),
+    specifications: product.specifications || getDefaultSpecifications(product),
+    inStock: (product.stock || 0) > 0,
+    badge: getProductBadge(product),
+    weight: product.weight,
+    dimensions: product.dimensions,
+    tags: product.tags || [],
+    status: product.status,
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt
+  };
+};
+
+// Helper function to generate color values
+const getColorValue = (colorName) => {
+  const colorMap = {
+    'black': '#000000',
+    'white': '#ffffff',
+    'red': '#ff0000',
+    'blue': '#0000ff',
+    'green': '#00ff00',
+    'yellow': '#ffff00',
+    'purple': '#800080',
+    'pink': '#ffc0cb',
+    'orange': '#ffa500',
+    'gray': '#808080',
+    'brown': '#a52a2a',
+    'navy': '#000080',
+    'teal': '#008080',
+    'maroon': '#800000',
+    'olive': '#808000',
+    'silver': '#c0c0c0',
+    'gold': '#ffd700',
+  };
+  
+  // Return mapped color or generate a random color for unknown colors
+  const lowerColor = colorName.toLowerCase();
+  return colorMap[lowerColor] || `#${Math.floor(Math.random()*16777215).toString(16)}`;
+};
+
+// Helper function to determine product badge
+const getProductBadge = (product) => {
+  if (product.salePrice && product.originalPrice > product.salePrice) {
+    return 'Sale';
+  }
+  if (product.featured) {
+    return 'Featured';
+  }
+  if (product.stock < 10) {
+    return 'Low Stock';
+  }
+  return 'New';
+};
+
+// Default features if none provided
+const getDefaultFeatures = (product) => {
+  return [
+    "High quality materials",
+    "Premium craftsmanship",
+    "Excellent durability",
+    "Great value for money"
+  ];
+};
+
+// Default specifications if none provided
+const getDefaultSpecifications = (product) => {
+  return {
+    "Material": "Premium quality",
+    "Dimensions": product.dimensions || "Standard size",
+    "Weight": product.weight ? `${product.weight} units` : "Lightweight",
+    "Warranty": "1 year manufacturer warranty"
+  };
+};
+
+export default function ProductDetail() {
+  const { id } = useParams();
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [activeTab, setActiveTab] = useState('description');
+  const [transformedProduct, setTransformedProduct] = useState(null);
+
+  const { addToCart, toggleCart } = useCart();
   const { 
     loading, 
     error, 
+    currentProduct: productDetail,
+    relatedProducts,
+    recentlyViewed,
     fetchProductById, 
     fetchRelatedProducts,
-    clearCurrentProduct,
-    clearError
+    fetchRecentlyViewed,
+    clearError 
   } = useProducts();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        clearError(); // Clear any previous errors
+        clearError();
+        console.log('🔄 Fetching product with ID:', id);
         
-        // Fetch the main product
+        // Fetch main product
         const productData = await fetchProductById(id);
-        setProductDetail(productData.product);
+        console.log('📦 Raw product data from API:', productData);
         
-        if (productData.colors && productData.colors.length > 0) {
-          setSelectedColor(productData.colors[0].name);
-        }
-        if (productData.sizes && productData.sizes.length > 0) {
-          setSelectedSize(productData.sizes[0]);
-        }
-        
-        // Fetch related products
-        if (productData.category) {
-          fetchRelatedProducts(id, productData.category, 4);
+        if (productData) {
+          // Transform the API data to match frontend structure
+          const transformed = transformProductData(productData.product);
+          setTransformedProduct(transformed);
+          
+          // Set default selections
+          if (transformed.colors?.length > 0) {
+            setSelectedColor(transformed.colors[0].name);
+          }
+          if (transformed.sizes?.length > 0) {
+            setSelectedSize(transformed.sizes[0]);
+          }
+          
+          // Fetch related products
+          if (transformed.category) {
+            await fetchRelatedProducts(id, transformed.category, 4);
+          }
+          
+          await fetchRecentlyViewed(id);
         }
         
       } catch (err) {
-        console.error('Error fetching product:', err);
-        // Error is handled by the context
+        console.error('❌ Error fetching product:', err);
       }
     };
 
-    fetchData();
+    if (id) {
+      fetchData();
+    }
+  }, [id, fetchProductById, fetchRelatedProducts, fetchRecentlyViewed, clearError]);
 
-    // Cleanup function to clear current product when component unmounts
-    return () => {
-      clearCurrentProduct();
-    };
-  }, [id, fetchProductById, fetchRelatedProducts, clearCurrentProduct, clearError]);
+  // Debug effect to monitor data changes
+  useEffect(() => {
+    if (transformedProduct) {
 
-console.log(ProductDetail)
+    }
+  }, [transformedProduct]);
 
-  
+  // Show loading state
+  if (loading && !transformedProduct) {
+    return <ProductDetailLoading />;
+  }
+
+  // Show error state
+  if (error || !transformedProduct) {
+    return (
+      <ProductDetailError 
+        error={error} 
+        onRetry={() => window.location.reload()} 
+      />
+    );
+  }
+
+  // Safe image URL function
+  const getImageUrl = (image) => {
+    if (!image) {
+      return '/placeholder-image.jpg';
+    }
+    if (typeof image === 'string') {
+      return image;
+    }
+    if (image.url) {
+      console.log('🖼️ Image URL found:', image.url);
+      return image.url;
+    }
+    console.log('🖼️ Invalid image format, using placeholder');
+    return '/placeholder-image.jpg';
+  };
+
+  // Safe alt text function
+  const getAltText = (product, index = null) => {
+    const baseAlt = product?.name || 'Product';
+    if (index !== null) {
+      return `${baseAlt} - View ${index + 1}`;
+    }
+    return baseAlt;
+  };
+
   const handleAddToCart = () => {
-    const colorObj = product.colors.find(c => c.name === selectedColor);
+    console.log('🛒 Adding to cart:', transformedProduct);
     
-   const cartItem = {
-    id: product.id,
-    name: product.name,
-    price: product.price,
-    image: product.images[0],
-    brand: product.brand,
-    color: selectedColor,
-    colorLabel: colorObj?.label || selectedColor,
-    colorValue: colorObj?.value || selectedColor,
-    size: selectedSize,
-    quantity: quantity,
-    cartId: Date.now() + product.id
+    const colorObj = transformedProduct.colors?.find(c => c.name === selectedColor);
+    
+    const cartItem = {
+      id: transformedProduct.id,
+      name: transformedProduct.name,
+      price: transformedProduct.price,
+      image: getImageUrl(transformedProduct.images?.[0]),
+      brand: transformedProduct.brand,
+      color: selectedColor,
+      colorLabel: colorObj?.label || selectedColor,
+      colorValue: colorObj?.value || selectedColor,
+      size: selectedSize,
+      quantity: quantity,
+      cartId: Date.now() + transformedProduct.id
+    };
+
+    console.log('🛒 Cart item prepared:', cartItem);
+    
+    addToCart(cartItem);
+    toggleCart();
+    
+    toast.success('Added to cart!', {
+      position: 'bottom-right',
+      style: {
+        background: '#10B981',
+        color: '#fff',
+      },
+    });
   };
 
-  addToCart(cartItem);
-  toggleCart();
-  
-  // Show success toast
-  toast.success('Added to cart!', {
-    position: 'bottom-right',
-    style: {
-      background: '#10B981',
-      color: '#fff',
-    },
-  });
-    console.log('Added to cart:', cartItem);
+  // Render product specifications tab content
+  const renderSpecifications = () => {
+    const specs = transformedProduct.specifications || {};
+    return (
+      <div className="grid md:grid-cols-2 gap-8">
+        {Object.entries(specs).map(([key, value]) => (
+          <div key={key} className="flex justify-between py-3 border-b border-gray-800">
+            <span className="font-medium text-gray-300">{key}</span>
+            <span className="text-white">{value}</span>
+          </div>
+        ))}
+      </div>
+    );
   };
+
+  // Render description tab content
+  const renderDescription = () => {
+    return (
+      <div className="prose prose-invert max-w-none">
+        <p className="text-gray-300 leading-relaxed text-lg mb-6">
+          {transformedProduct.description || "No description available."}
+        </p>
+        <div className="grid md:grid-cols-2 gap-8">
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-4">Product Details</h3>
+            <ul className="space-y-2 text-gray-300">
+              <li>• Brand: {transformedProduct.brand}</li>
+              <li>• Category: {transformedProduct.category}</li>
+              <li>• SKU: {transformedProduct.sku}</li>
+              {transformedProduct.weight && <li>• Weight: {transformedProduct.weight} units</li>}
+              {transformedProduct.dimensions && <li>• Dimensions: {transformedProduct.dimensions}</li>}
+            </ul>
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-4">Additional Information</h3>
+            <ul className="space-y-2 text-gray-300">
+              <li>• Premium Quality</li>
+              <li>• Secure Packaging</li>
+              <li>• Fast Delivery</li>
+              <li>• Customer Support</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  console.log('🎨 Rendering with transformed product:', transformedProduct);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -169,9 +422,11 @@ console.log(ProductDetail)
             <span className="text-gray-600">/</span>
             <a href="/products" className="text-gray-400 hover:text-white transition-colors">Products</a>
             <span className="text-gray-600">/</span>
-            <a href={`/category/${product.category.toLowerCase()}`} className="text-gray-400 hover:text-white transition-colors">{product.category}</a>
+            <a href={`/category/${transformedProduct.category?.toLowerCase()}`} className="text-gray-400 hover:text-white transition-colors">
+              {transformedProduct.category || 'Uncategorized'}
+            </a>
             <span className="text-gray-600">/</span>
-            <span className="text-white font-medium">{product.name}</span>
+            <span className="text-white font-medium">{transformedProduct.name}</span>
           </nav>
         </div>
       </div>
@@ -183,34 +438,28 @@ console.log(ProductDetail)
           <div className="space-y-4">
             {/* Main Image */}
             <div className="relative h-96 lg:h-[500px] rounded-2xl overflow-hidden bg-gray-900">
-              <Image
-                src={ProductDetail?.images?.[selectedImage]?.url || '/placeholder-image.jpg'}
-                alt={ProductDetail?.name || 'Product image'}
+              <SafeImage
+                src={getImageUrl(transformedProduct.images?.[selectedImage])}
+                alt={getAltText(transformedProduct)}
                 fill
                 className="object-cover"
                 priority
               />
+              {/* Product Badge */}
               <div className="absolute top-4 left-4">
-                <span
-                  className={`px-3 py-1 text-sm font-medium rounded-full ${
-                    product.badge === 'Best Seller'
-                      ? 'bg-blue-500'
-                      : product.badge === 'New'
-                      ? 'bg-green-500'
-                      : product.badge === 'Sale'
-                      ? 'bg-red-500'
-                      : 'bg-purple-500'
-                  } text-white`}
-                >
-                  {product.badge}
+                <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                  transformedProduct.badge === 'Sale' ? 'bg-red-500' :
+                  transformedProduct.badge === 'Featured' ? 'bg-blue-500' :
+                  transformedProduct.badge === 'Low Stock' ? 'bg-orange-500' : 'bg-green-500'
+                } text-white`}>
+                  {transformedProduct.badge}
                 </span>
               </div>
             </div>
 
-
             {/* Thumbnail Images */}
             <div className="grid grid-cols-4 gap-4">
-              {ProductDetail?.images.map((image, index) => (
+              {transformedProduct.images?.map((image, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
@@ -220,9 +469,9 @@ console.log(ProductDetail)
                       : 'border-gray-700 hover:border-gray-600'
                   }`}
                 >
-                  <Image
-                    src={image?.url}
-                    alt={`${ProductDetail?.name} view ${index + 1}`}
+                  <SafeImage
+                    src={getImageUrl(image)}
+                    alt={getAltText(transformedProduct, index)}
                     fill
                     className="object-cover"
                   />
@@ -235,8 +484,8 @@ console.log(ProductDetail)
           <div className="space-y-6">
             {/* Brand and Title */}
             <div>
-              <p className="text-purple-300 font-medium mb-2">{ProductDetail?.brand}</p>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4">{ProductDetail?.name}</h1>
+              <p className="text-purple-300 font-medium mb-2">{transformedProduct.brand}</p>
+              <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4">{transformedProduct.name}</h1>
               
               {/* Rating and Reviews */}
               <div className="flex items-center space-x-4 mb-4">
@@ -245,7 +494,7 @@ console.log(ProductDetail)
                     {[...Array(5)].map((_, i) => (
                       <svg
                         key={i}
-                        className={`w-5 h-5 ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-600'}`}
+                        className={`w-5 h-5 ${i < Math.floor(transformedProduct.rating) ? 'text-yellow-400' : 'text-gray-600'}`}
                         fill="currentColor"
                         viewBox="0 0 20 20"
                       >
@@ -253,22 +502,22 @@ console.log(ProductDetail)
                       </svg>
                     ))}
                   </div>
-                  <span className="text-white font-medium">{product.rating}</span>
-                  <span className="text-gray-400">({product.reviews} reviews)</span>
+                  <span className="text-white font-medium">{transformedProduct.rating}</span>
+                  <span className="text-gray-400">({transformedProduct.reviews} reviews)</span>
                 </div>
                 <div className="text-gray-400">|</div>
-                <p className="text-gray-400">SKU: {ProductDetail?.sku}</p>
+                <p className="text-gray-400">SKU: {transformedProduct.sku}</p>
               </div>
             </div>
 
             {/* Price */}
             <div className="flex items-center space-x-4">
-              <span className="text-3xl font-bold text-white">€{product.price}</span>
-              {product.originalPrice && (
+              <span className="text-3xl font-bold text-white">€{transformedProduct.price}</span>
+              {transformedProduct.originalPrice && transformedProduct.originalPrice > transformedProduct.price && (
                 <>
-                  <span className="text-xl text-gray-500 line-through">€{product.originalPrice}</span>
+                  <span className="text-xl text-gray-500 line-through">€{transformedProduct.originalPrice}</span>
                   <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                    Save €{(product.originalPrice - product.price).toFixed(2)}
+                    Save €{(transformedProduct.originalPrice - transformedProduct.price).toFixed(2)}
                   </span>
                 </>
               )}
@@ -276,59 +525,63 @@ console.log(ProductDetail)
 
             {/* Stock Status */}
             <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${ProductDetail?.stock ? 'bg-green-400' : 'bg-red-400'}`}></div>
-              <span className={`font-medium ${ProductDetail?.stock ? 'text-green-400' : 'text-red-400'}`}>
-                {ProductDetail?.stock ? `In Stock (${ProductDetail?.stock} available)` : 'Out of Stock'}
+              <div className={`w-3 h-3 rounded-full ${transformedProduct.stock > 0 ? 'bg-green-400' : 'bg-red-400'}`}></div>
+              <span className={`font-medium ${transformedProduct.stock > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {transformedProduct.stock > 0 ? `In Stock (${transformedProduct.stock} available)` : 'Out of Stock'}
               </span>
             </div>
 
             {/* Color Selection */}
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-3">
-                Color: <span className="text-purple-300">{product.colors.find(c => c.name === selectedColor)?.label}</span>
-              </h3>
-              <div className="flex space-x-3">
-                {product.colors.map((color) => (
-                  <button
-                    key={color.name}
-                    onClick={() => setSelectedColor(color.name)}
-                    className={`w-12 h-12 rounded-xl border-2 transition-all ${
-                      selectedColor === color.name 
-                        ? 'border-purple-500 shadow-lg shadow-purple-500/25' 
-                        : 'border-gray-600 hover:border-gray-500'
-                    }`}
-                    style={{ backgroundColor: color.value }}
-                    title={color.label}
-                  >
-                    {color.name === 'white' && (
-                      <div className="w-full h-full rounded-lg border border-gray-300"></div>
-                    )}
-                  </button>
-                ))}
+            {transformedProduct.colors && transformedProduct.colors.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-3">
+                  Color: <span className="text-purple-300">{transformedProduct.colors.find(c => c.name === selectedColor)?.label}</span>
+                </h3>
+                <div className="flex space-x-3">
+                  {transformedProduct.colors.map((color) => (
+                    <button
+                      key={color.name}
+                      onClick={() => setSelectedColor(color.name)}
+                      className={`w-12 h-12 rounded-xl border-2 transition-all ${
+                        selectedColor === color.name 
+                          ? 'border-purple-500 shadow-lg shadow-purple-500/25' 
+                          : 'border-gray-600 hover:border-gray-500'
+                      }`}
+                      style={{ backgroundColor: color.value }}
+                      title={color.label}
+                    >
+                      {color.name === 'white' && (
+                        <div className="w-full h-full rounded-lg border border-gray-300"></div>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Size Selection */}
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-3">
-                Size: <span className="text-purple-300">{selectedSize}</span>
-              </h3>
-              <div className="flex space-x-3">
-                {product.sizes.map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`w-12 h-12 rounded-xl border-2 font-medium transition-all ${
-                      selectedSize === size 
-                        ? 'border-purple-500 bg-purple-500 text-white' 
-                        : 'border-gray-600 text-gray-300 hover:border-gray-500 hover:text-white'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
+            {transformedProduct.sizes && transformedProduct.sizes.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-3">
+                  Size: <span className="text-purple-300">{selectedSize}</span>
+                </h3>
+                <div className="flex space-x-3">
+                  {transformedProduct.sizes.map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => setSelectedSize(size)}
+                      className={`w-12 h-12 rounded-xl border-2 font-medium transition-all ${
+                        selectedSize === size 
+                          ? 'border-purple-500 bg-purple-500 text-white' 
+                          : 'border-gray-600 text-gray-300 hover:border-gray-500 hover:text-white'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Quantity */}
             <div>
@@ -345,7 +598,7 @@ console.log(ProductDetail)
                   </button>
                   <span className="px-4 py-3 text-white font-medium">{quantity}</span>
                   <button
-                    onClick={() => setQuantity(Math.min(ProductDetail?.stock, quantity + 1))}
+                    onClick={() => setQuantity(Math.min(transformedProduct.stock, quantity + 1))}
                     className="p-3 text-gray-300 hover:text-white transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,7 +606,7 @@ console.log(ProductDetail)
                     </svg>
                   </button>
                 </div>
-                <span className="text-gray-400">({product.stockCount} available)</span>
+                <span className="text-gray-400">({transformedProduct.stock} available)</span>
               </div>
             </div>
 
@@ -361,32 +614,38 @@ console.log(ProductDetail)
             <div className="flex space-x-4">
               <button
                 onClick={handleAddToCart}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center justify-center space-x-2"
+                disabled={!transformedProduct.stock || transformedProduct.stock === 0}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center justify-center space-x-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                <span>Add to Cart</span>
+                <span>{transformedProduct.stock > 0 ? 'Add to Cart' : 'Out of Stock'}</span>
               </button>
-              <button className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-4 rounded-xl font-semibold transition-colors">
+              <button 
+                className="bg-gray-800 hover:bg-gray-700 text-white px-8 py-4 rounded-xl font-semibold transition-colors"
+                disabled={!transformedProduct.stock || transformedProduct.stock === 0}
+              >
                 Buy Now
               </button>
             </div>
 
             {/* Features */}
-            <div className="bg-gray-900/50 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
-              <h3 className="text-lg font-semibold text-white mb-4">Key Features</h3>
-              <ul className="space-y-2">
-                {product.features.map((feature, index) => (
-                  <li key={index} className="flex items-center space-x-3 text-gray-300">
-                    <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {transformedProduct.features && transformedProduct.features.length > 0 && (
+              <div className="bg-gray-900/50 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
+                <h3 className="text-lg font-semibold text-white mb-4">Key Features</h3>
+                <ul className="space-y-2">
+                  {transformedProduct.features.map((feature, index) => (
+                    <li key={index} className="flex items-center space-x-3 text-gray-300">
+                      <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Trust Badges */}
             <div className="flex items-center justify-between bg-gray-900/50 backdrop-blur-md rounded-2xl p-4 border border-gray-800">
@@ -433,174 +692,22 @@ console.log(ProductDetail)
           </div>
 
           <div className="py-8">
-            {activeTab === 'description' && (
-              <div className="prose prose-invert max-w-none">
-                <p className="text-gray-300 leading-relaxed text-lg mb-6">
-                  {ProductDetail?.description}
-                </p>
-                <div className="grid md:grid-cols-2 gap-8">
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-4">What's in the Box</h3>
-                    <ul className="space-y-2 text-gray-300">
-                      <li>• Premium Wireless Headphones</li>
-                      <li>• USB-C Charging Cable</li>
-                      <li>• 3.5mm Audio Cable</li>
-                      <li>• Travel Case</li>
-                      <li>• Quick Start Guide</li>
-                      <li>• Warranty Card</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-4">Compatibility</h3>
-                    <ul className="space-y-2 text-gray-300">
-                      <li>• iOS devices (iPhone, iPad)</li>
-                      <li>• Android smartphones and tablets</li>
-                      <li>• Windows PC and Mac</li>
-                      <li>• Gaming consoles</li>
-                      <li>• Smart TVs with Bluetooth</li>
-                      <li>• Any device with 3.5mm jack</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'specifications' && (
-              <div className="grid md:grid-cols-2 gap-8">
-                {Object.entries(product.specifications).map(([key, value]) => (
-                  <div key={key} className="flex justify-between py-3 border-b border-gray-800">
-                    <span className="font-medium text-gray-300">{key}</span>
-                    <span className="text-white">{value}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
+            {activeTab === 'description' && renderDescription()}
+            {activeTab === 'specifications' && renderSpecifications()}
             {activeTab === 'reviews' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-semibold text-white">Customer Reviews</h3>
-                  <button className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl font-medium transition-colors">
-                    Write a Review
-                  </button>
-                </div>
-                
-                <div className="grid md:grid-cols-3 gap-8">
-                  <div className="bg-gray-900/50 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
-                    <div className="text-center">
-                      <div className="text-4xl font-bold text-white mb-2">{product.rating}</div>
-                      <div className="flex justify-center mb-2">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-5 h-5 ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-600'}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <p className="text-gray-400">Based on {product.reviews} reviews</p>
-                    </div>
-                  </div>
-                  
-                  <div className="md:col-span-2 space-y-6">
-                    {/* Sample Reviews */}
-                    {[
-                      {
-                        name: "Sarah M.",
-                        rating: 5,
-                        date: "2 days ago",
-                        title: "Exceptional sound quality!",
-                        comment: "These headphones exceeded my expectations. The noise cancellation is incredible and the battery life is amazing. Perfect for my daily commute."
-                      },
-                      {
-                        name: "Mike R.",
-                        rating: 4,
-                        date: "1 week ago", 
-                        title: "Great value for money",
-                        comment: "Really impressed with the build quality and comfort. Only minor complaint is they can get a bit warm during long sessions."
-                      }
-                    ].map((review, index) => (
-                      <div key={index} className="bg-gray-900/30 rounded-xl p-6 border border-gray-800">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="font-semibold text-white">{review.title}</h4>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <div className="flex">
-                                {[...Array(5)].map((_, i) => (
-                                  <svg
-                                    key={i}
-                                    className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400' : 'text-gray-600'}`}
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                  </svg>
-                                ))}
-                              </div>
-                              <span className="text-gray-400 text-sm">by {review.name}</span>
-                              <span className="text-gray-500 text-sm">{review.date}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-gray-300">{review.comment}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="text-center py-8">
+                <p className="text-gray-400">No reviews yet. Be the first to review this product!</p>
               </div>
             )}
-
             {activeTab === 'shipping' && (
               <div className="grid md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <h3 className="text-xl font-semibold text-white">Shipping Information</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-3">
-                      <svg className="w-6 h-6 text-green-400 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-                      </svg>
-                      <div>
-                        <h4 className="font-semibold text-white">Free Standard Shipping</h4>
-                        <p className="text-gray-300">Orders over €50 • 3-5 business days</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <svg className="w-6 h-6 text-blue-400 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                        <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1V8a1 1 0 00-1-1h-3z" />
-                      </svg>
-                      <div>
-                        <h4 className="font-semibold text-white">Express Delivery</h4>
-                        <p className="text-gray-300">€9.99 • Next business day</p>
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-white mb-4">Shipping Information</h3>
+                  <p className="text-gray-300">Free standard shipping on orders over €50. Express delivery available.</p>
                 </div>
-                <div className="space-y-6">
-                  <h3 className="text-xl font-semibold text-white">Return Policy</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-3">
-                      <svg className="w-6 h-6 text-purple-400 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                      </svg>
-                      <div>
-                        <h4 className="font-semibold text-white">30-Day Returns</h4>
-                        <p className="text-gray-300">Free returns within 30 days of purchase</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <svg className="w-6 h-6 text-yellow-400 mt-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <div>
-                        <h4 className="font-semibold text-white">Quality Guarantee</h4>
-                        <p className="text-gray-300">1-year manufacturer warranty included</p>
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-white mb-4">Return Policy</h3>
+                  <p className="text-gray-300">30-day money-back guarantee. Free returns within the EU.</p>
                 </div>
               </div>
             )}
@@ -608,122 +715,64 @@ console.log(ProductDetail)
         </div>
 
         {/* Related Products */}
-        <div className="mt-20">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold text-white">You Might Also Like</h2>
-            <button className="text-purple-400 hover:text-purple-300 font-semibold flex items-center space-x-2 transition-colors group">
-              <span>View all</span>
-              <span className="transform group-hover:translate-x-1 transition-transform">→</span>
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.map((relatedProduct) => (
-              <div key={relatedProduct.id} className="group">
-                <div className="relative h-64 mb-4 overflow-hidden rounded-2xl bg-gray-900">
-                  <Image
-                    src={relatedProduct.image}
-                    alt={relatedProduct.name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-all duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-all"></div>
-                  
-                  {/* Quick add button for related products */}
-                  <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0">
-                    <button className="w-full bg-white text-black py-2 rounded-xl font-semibold hover:bg-gray-100 transition-colors">
-                      Quick View
-                    </button>
-                  </div>
-                </div>
-                
-                <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
-                  {relatedProduct.name}
-                </h3>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-bold text-white">€{relatedProduct.price}</span>
-                  <div className="flex items-center space-x-1">
-                    <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    <span className="text-gray-400 text-sm">{relatedProduct.rating}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recently Viewed */}
-        <div className="mt-16 bg-gray-900/50 backdrop-blur-md rounded-2xl p-8 border border-gray-800">
-          <h2 className="text-2xl font-bold text-white mb-6">Recently Viewed</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {[...Array(6)].map((_, index) => (
-              <div key={index} className="group cursor-pointer">
-                <div className="relative h-32 mb-2 overflow-hidden rounded-xl bg-gray-800">
-                  <Image
-                    src="/product-headphones.jpg"
-                    alt="Recently viewed product"
-                    fill
-                    className="object-cover group-hover:scale-110 transition-all duration-300"
-                  />
-                </div>
-                <p className="text-sm text-gray-300 group-hover:text-white transition-colors">
-                  Sample Product {index + 1}
-                </p>
-                <p className="text-sm font-semibold text-white">€{(99.99 + index * 10).toFixed(2)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Sticky Add to Cart Bar (Mobile) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-md border-t border-gray-800 p-4 z-50">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-white font-semibold">€{product.price}</p>
-            <p className="text-gray-400 text-sm">{product.name}</p>
-          </div>
-          <button
-            onClick={handleAddToCart}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-            </svg>
-            <span>Add to Cart</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Newsletter Section */}
-      <section className="py-16 bg-gradient-to-r from-purple-900 to-blue-900 relative overflow-hidden mt-16">
-        <div className="absolute inset-0 bg-black/50"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Stay Updated
-            </h2>
-            <p className="text-purple-100 text-lg mb-8">
-              Get notified about new products, exclusive deals, and special offers.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
-              <input 
-                type="email" 
-                placeholder="Your email address" 
-                className="flex-grow px-6 py-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-white/40 transition-all"
-              />
-              <button className="bg-white text-purple-900 px-6 py-3 rounded-xl font-semibold hover:bg-gray-100 transition-all transform hover:scale-105">
-                Subscribe
-              </button>
+        {relatedProducts.length > 0 && (
+          <div className="mt-20">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-bold text-white">You Might Also Like</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {relatedProducts.map((relatedProduct) => {
+                const transformedRelated = transformProductData(relatedProduct);
+                return (
+                  <a key={transformedRelated.id} href={`/product/${transformedRelated.id}`} className="group">
+                    <div className="relative h-64 mb-4 overflow-hidden rounded-2xl bg-gray-900">
+                      <SafeImage
+                        src={getImageUrl(transformedRelated.images?.[0])}
+                        alt={getAltText(transformedRelated)}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-all duration-300"
+                      />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
+                      {transformedRelated.name}
+                    </h3>
+                    <span className="text-xl font-bold text-white">€{transformedRelated.price}</span>
+                  </a>
+                );
+              })}
             </div>
           </div>
-        </div>
-        <div className="absolute top-10 left-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-10 right-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl"></div>
-      </section>
+        )}
+
+        {/* Recently Viewed */}
+        {recentlyViewed.length > 0 && (
+          <div className="mt-16 bg-gray-900/50 backdrop-blur-md rounded-2xl p-8 border border-gray-800">
+            <h2 className="text-2xl font-bold text-white mb-6">Recently Viewed</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {recentlyViewed.map((product) => {
+                const transformedRecent = transformProductData(product);
+                return (
+                  <a key={transformedRecent.id} href={`/product/${transformedRecent.id}`} className="group cursor-pointer">
+                    <div className="relative h-32 mb-2 overflow-hidden rounded-xl bg-gray-800">
+                      <SafeImage
+                        src={getImageUrl(transformedRecent.images?.[0])}
+                        alt={getAltText(transformedRecent)}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-all duration-300"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-300 group-hover:text-white transition-colors truncate">
+                      {transformedRecent.name}
+                    </p>
+                    <p className="text-sm font-semibold text-white">€{transformedRecent.price}</p>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       <Footer />
     </div>

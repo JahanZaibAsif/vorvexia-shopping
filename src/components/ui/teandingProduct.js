@@ -6,35 +6,41 @@ import { ChevronLeft, ChevronRight, Heart, Eye, ShoppingCart, Loader } from 'luc
 import { useCart } from '@/context/CartContext'
 import { useProducts } from '@/context/ProductContext'
 
-function TrendingProduct() {
- 
+function TrendingProduct({ onProductClick }) {
   const [loadMoreLoading, setLoadMoreLoading] = useState(false)
   const [currentImageIndexes, setCurrentImageIndexes] = useState({})
   const [autoPlay, setAutoPlay] = useState(true)
-  const [displayCount, setDisplayCount] = useState(12) // Show 12 products initially
+  const [displayCount, setDisplayCount] = useState(12)
+  const [imageErrors, setImageErrors] = useState({})
 
   const { addToCart } = useCart();
-   const { 
-        products, 
-        loading, 
-        fetchProducts,
-        error, 
-        clearError
-    } = useProducts();
-  
+  const { 
+    products, 
+    loading, 
+    fetchProducts,
+    error, 
+    clearError
+  } = useProducts();
+
+  // Helper to extract image URL
+  const getImageUrl = (imageData) => {
+    if (!imageData) return null;
+    if (typeof imageData === 'string' && imageData.trim() !== '') return imageData;
+    if (imageData.url && imageData.url.trim() !== '') return imageData.url;
+    return null;
+  };
 
   useEffect(() => {
-         const loadProducts = async () => {
-             try {
-                 await fetchProducts();
-             } catch (err) {
-                 console.error('Error loading products:', err);
-             }
-         };
-         loadProducts();
-     }, [fetchProducts]);
+    const loadProducts = async () => {
+      try {
+        await fetchProducts();
+      } catch (err) {
+        console.error('Error loading products:', err);
+      }
+    };
+    loadProducts();
+  }, [fetchProducts]);
 
-  // Initialize image indexes when products load
   useEffect(() => {
     if (products.length > 0) {
       const initialIndexes = {};
@@ -47,7 +53,6 @@ function TrendingProduct() {
     }
   }, [products, displayCount]);
 
-  // Auto-play slider
   useEffect(() => {
     if (!autoPlay || products.length === 0) return;
 
@@ -66,6 +71,14 @@ function TrendingProduct() {
 
     return () => clearInterval(interval);
   }, [autoPlay, products]);
+
+  const handleQuickView = (productId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onProductClick) {
+      onProductClick(productId);
+    }
+  };
 
   const nextImage = (productId, productImages) => {
     setCurrentImageIndexes(prev => ({
@@ -98,24 +111,20 @@ function TrendingProduct() {
     e.preventDefault();
     e.stopPropagation();
     
+    const firstImage = product.images?.[0];
+    const imageUrl = getImageUrl(firstImage);
+    
     addToCart({
       id: product._id || product.id,
       name: product.name,
       price: product.salePrice || product.price,
-      image: product.images && product.images.length > 0 ? product.images[0].url : '/placeholder.png',
+      image: imageUrl || '/placeholder.png',
       quantity: 1
     });
   };
 
-  const openQuickView = (product, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('Quick view:', product)
-  };
-
   const handleLoadMore = async () => {
     setLoadMoreLoading(true);
-    // Simulate loading delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     setDisplayCount(prev => prev + 12);
     setLoadMoreLoading(false);
@@ -135,11 +144,16 @@ function TrendingProduct() {
     return 'Trending';
   };
 
-  // Get products to display (first N products based on displayCount)
+  const handleImageError = (productId, imageIndex) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [`${productId}-${imageIndex}`]: true
+    }));
+  };
+
   const displayedProducts = products.slice(0, displayCount);
   const hasMoreProducts = products.length > displayCount;
 
-  // Loading state
   if (loading && products.length === 0) {
     return (
       <section className="py-20 bg-black">
@@ -173,7 +187,6 @@ function TrendingProduct() {
     )
   }
 
-  // Error state
   if (error) {
     return (
       <section className="py-20 bg-black">
@@ -221,7 +234,6 @@ function TrendingProduct() {
           </Link>
         </div>
 
-        {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {displayedProducts.map((product, index) => {
             const productId = product._id || product.id;
@@ -230,111 +242,112 @@ function TrendingProduct() {
             const hasMultipleImages = productImages.length > 1;
             const salePrice = product.salePrice || product.originalPrice;
             const originalPrice = product.salePrice ? product.originalPrice : null;
+            
+            const currentImageData = productImages[currentImageIndex];
+            const currentImageUrl = getImageUrl(currentImageData);
+            const showPlaceholder = !currentImageUrl || imageErrors[`${productId}-${currentImageIndex}`];
 
             return (
-              <Link key={productId} href={`/products/${productId}`} className="group block">
+              <div 
+                key={productId} 
+                onClick={(e) => handleQuickView(productId, e)}
+                className="group block cursor-pointer"
+              >
                 <div className="group bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-4 border border-gray-700 hover:border-purple-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/10 h-full flex flex-col">
                   <div className="relative h-80 mb-4 overflow-hidden rounded-xl bg-gray-800 flex-shrink-0">
-                    {/* Product Image with Slider */}
-                    {productImages.length > 0 ? (
-                      <>
-                        <Image
-                          src={productImages[currentImageIndex]?.url || '/placeholder.png'}
-                          alt={product.name}
-                          fill
-                          className="object-cover transition-all duration-500"
-                          onError={(e) => {
-                            e.target.src = '/placeholder.png';
-                          }}
-                        />
-                        
-                        {/* Image Navigation Arrows */}
-                        {hasMultipleImages && (
-                          <>
-                            <button 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                prevImage(productId, productImages);
-                              }}
-                              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300"
-                            >
-                              <ChevronLeft size={20} />
-                            </button>
-                            <button 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                nextImage(productId, productImages);
-                              }}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300"
-                            >
-                              <ChevronRight size={20} />
-                            </button>
-                          </>
-                        )}
-
-                        {/* Image Dots Indicator */}
-                        {hasMultipleImages && (
-                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-1">
-                            {productImages.map((_, imgIndex) => (
-                              <button
-                                key={imgIndex}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  goToImage(productId, imgIndex);
-                                }}
-                                className={`w-2 h-2 rounded-full transition-all ${
-                                  imgIndex === currentImageIndex
-                                    ? 'bg-white'
-                                    : 'bg-white/50 hover:bg-white/70'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </>
+                    {!showPlaceholder ? (
+                      <Image
+                        src={currentImageUrl}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-all duration-500"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        onError={() => handleImageError(productId, currentImageIndex)}
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                        <span className="text-gray-400 text-lg">No Image</span>
+                        <ShoppingCart className="w-16 h-16 text-gray-500 opacity-50" />
                       </div>
+                    )}
+                    
+                    {hasMultipleImages && !showPlaceholder && (
+                      <>
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            prevImage(productId, productImages);
+                          }}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 z-10"
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            nextImage(productId, productImages);
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 z-10"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-1 z-10">
+                          {productImages.map((_, imgIndex) => (
+                            <button
+                              key={imgIndex}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                goToImage(productId, imgIndex);
+                              }}
+                              className={`w-2 h-2 rounded-full transition-all ${
+                                imgIndex === currentImageIndex
+                                  ? 'bg-white w-4'
+                                  : 'bg-white/50 hover:bg-white/70'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </>
                     )}
 
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-70 group-hover:opacity-50 transition-all"></div>
                     
-                    {/* Product Badge */}
-                    <div className="absolute top-4 left-4">
+                    <div className="absolute top-4 left-4 z-10">
                       <span className={`px-3 py-1 text-xs font-medium rounded-full bg-gradient-to-r ${getBadgeColor(product)} text-white`}>
                         {getBadgeText(product)}
                       </span>
                     </div>
 
-                    {/* Stock Status */}
                     {(!product.stock || product.stock === 0) && (
-                      <div className="absolute top-4 right-4">
+                      <div className="absolute top-4 right-4 z-10">
                         <span className="bg-gray-800/90 text-gray-300 px-3 py-1 text-xs font-medium rounded-full">
                           Out of Stock
                         </span>
                       </div>
                     )}
 
-                    {/* Quick Actions */}
-                    <div className="absolute top-4 right-4 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                      <button className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all transform hover:scale-110">
+                    <div className="absolute top-4 right-4 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all transform hover:scale-110"
+                      >
                         <Heart size={16} className="text-gray-800" />
                       </button>
                       <button 
-                        onClick={(e) => openQuickView(product, e)}
+                        onClick={(e) => handleQuickView(productId, e)}
                         className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all transform hover:scale-110"
                       >
                         <Eye size={16} className="text-gray-800" />
                       </button>
                     </div>
 
-                    {/* Add to cart button */}
                     {product.stock && product.stock > 0 && (
-                      <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 duration-300">
+                      <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 duration-300 z-10">
                         <button 
                           onClick={(e) => handleAddToCart(product, e)}
                           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center space-x-2"
@@ -346,13 +359,11 @@ function TrendingProduct() {
                     )}
                   </div>
                   
-                  {/* Product Info */}
                   <div className="p-2 flex-1 flex flex-col">
                     <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors line-clamp-2">
                       {product.name}
                     </h3>
                     
-                    {/* Rating */}
                     {product.rating && (
                       <div className="flex items-center space-x-2 mb-3">
                         <div className="flex">
@@ -389,7 +400,6 @@ function TrendingProduct() {
                       )}
                     </div>
                     
-                    {/* Stock Info */}
                     {product.stock && (
                       <p className="text-gray-400 text-sm mt-1">
                         {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
@@ -397,12 +407,11 @@ function TrendingProduct() {
                     )}
                   </div>
                 </div>
-              </Link>
+              </div>
             )
           })}
         </div>
 
-        {/* Load More Button */}
         {hasMoreProducts && (
           <div className="text-center">
             <button 
@@ -428,7 +437,6 @@ function TrendingProduct() {
           </div>
         )}
 
-        {/* Empty state */}
         {!loading && products.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-400 text-lg">No trending products available at the moment.</p>

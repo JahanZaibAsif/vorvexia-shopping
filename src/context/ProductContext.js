@@ -49,6 +49,12 @@ const productReducer = (state, action) => {
         relatedProducts: action.payload,
       };
 
+    case 'SET_RECENTLY_VIEWED':
+      return {
+        ...state,
+        recentlyViewed: action.payload,
+      };
+
     case 'SET_FILTERS':
       return {
         ...state,
@@ -77,6 +83,7 @@ const initialState = {
   products: [],
   currentProduct: null,
   relatedProducts: [],
+  recentlyViewed: [],
   loading: false,
   error: null,
   filters: {
@@ -143,6 +150,9 @@ export function ProductProvider({ children }) {
       const product = await response.json();
       dispatch({ type: 'FETCH_PRODUCT_SUCCESS', payload: product });
       
+      // Add to recently viewed
+      addToRecentlyViewed(id);
+      
       return product;
     } catch (error) {
       dispatch({ type: 'FETCH_PRODUCTS_ERROR', payload: error.message });
@@ -187,6 +197,48 @@ export function ProductProvider({ children }) {
     }
   }, []);
 
+  const fetchRecentlyViewed = useCallback(async (currentProductId = null, limit = 6) => {
+    try {
+      // Get recently viewed IDs from localStorage
+      const viewedIds = JSON.parse(localStorage.getItem('recentlyViewed') || '[]')
+        .filter(id => id !== currentProductId) // Exclude current product
+        .slice(0, limit);
+
+      if (viewedIds.length === 0) {
+        dispatch({ type: 'SET_RECENTLY_VIEWED', payload: [] });
+        return [];
+      }
+
+      // Fetch product details for the viewed IDs
+      const response = await fetch(
+        `${API_BASE_URL}/products/recently-viewed?ids=${viewedIds.join(',')}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch recently viewed products');
+      }
+
+      const recentlyViewed = await response.json();
+      dispatch({ type: 'SET_RECENTLY_VIEWED', payload: recentlyViewed.products || recentlyViewed });
+      
+      return recentlyViewed.products || recentlyViewed;
+    } catch (error) {
+      console.warn('Failed to fetch recently viewed:', error.message);
+      dispatch({ type: 'SET_RECENTLY_VIEWED', payload: [] });
+      return [];
+    }
+  }, []);
+
+  const addToRecentlyViewed = useCallback((productId) => {
+    try {
+      const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+      const updated = [productId, ...viewed.filter(id => id !== productId)].slice(0, 20);
+      localStorage.setItem('recentlyViewed', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Error adding to recently viewed:', err);
+    }
+  }, []);
+
   const fetchProductsByCategory = useCallback(async (category, limit) => {
     dispatch({ type: 'FETCH_PRODUCTS_START' });
     
@@ -209,7 +261,6 @@ export function ProductProvider({ children }) {
     }
   }, []);
 
-  
   const searchProducts = useCallback(async (searchTerm, filters = {}) => {
     dispatch({ type: 'FETCH_PRODUCTS_START' });
     
@@ -292,6 +343,7 @@ export function ProductProvider({ children }) {
     products: state.products,
     currentProduct: state.currentProduct,
     relatedProducts: state.relatedProducts,
+    recentlyViewed: state.recentlyViewed,
     loading: state.loading,
     error: state.error,
     filters: state.filters,
@@ -305,6 +357,7 @@ export function ProductProvider({ children }) {
     fetchProducts,
     fetchProductById,
     fetchRelatedProducts,
+    fetchRecentlyViewed,
     fetchProductsByCategory,
     searchProducts,
     setCurrentProduct,
